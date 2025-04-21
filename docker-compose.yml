@@ -1,0 +1,96 @@
+###############################################################################
+# mini‑ca – local CA + Nginx‑Proxy‑Manager (self‑contained)
+x-minica-image: &minica-image
+  image: minica:latest
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+
+###############################################################################
+services:
+# ─── mini‑ca – local init ─────────────────────────────────
+  init:
+    <<: *minica-image
+    user: "0"
+    entrypoint: ["entry-init.sh"]
+    volumes:
+      - minica-data:/data
+    profiles: ["setup"]
+    restart: "no"
+
+# ─── mini‑ca – local CA ─────────────────────────────────
+  minica:
+    <<: *minica-image
+    user: "1001"
+    volumes:
+      - minica-data:/data
+    restart: unless-stopped
+
+# ─── mini‑ca – local CA – CLI ────────────────────────────
+  cli:
+    <<: *minica-image
+    entrypoint: ["mini_ca.py"]
+    user: "1001"
+    profiles: ["cli"]
+    volumes:
+      - minica-data:/data
+      - npm_data:/npm-data
+
+
+# ─── MariaDB ──────────────────────────────────────────────
+  db:
+    image: jc21/mariadb-aria:latest
+    container_name: ${NPM_CONTAINER_NAME}_db
+    env_file: .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE:      ${DB_MYSQL_NAME}
+      MYSQL_USER:          ${DB_MYSQL_USER}
+      MYSQL_PASSWORD:      ${DB_MYSQL_PASSWORD}
+    volumes:
+      - npm_mysql:/var/lib/mysql
+    restart: unless-stopped
+
+# ─── Nginx‑Proxy‑Manager ─────────────────────────────────
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm
+    env_file: .env
+    depends_on: [db]
+    ports:
+      - "${NPM_PORT}"
+      - "${NPM_UI_PORT}"
+      - "${NPM_S_PORTS}"
+    volumes:
+      - npm_data:/data
+      - npm_letsencrypt:/etc/letsencrypt
+      - minica-data:/certs:ro
+    restart: unless-stopped
+
+# ─── Nginx‑Proxy‑Manager – SSL cert sync ─────────────────
+  cert-sync:
+    image: alpine:latest
+    container_name: cert-sync
+    env_file: .env
+    depends_on: [npm]
+    entrypoint:  ["/cert-sync.sh"]
+    environment:
+      - INITIAL_ADMIN_EMAIL
+      - NPM_INITIAL_PASSWORD
+    network_mode: service:npm
+    profiles: ["sync"]
+    restart: "no"
+    volumes:
+      - minica-data:/certs:ro
+      - npm_data:/data
+      - ./docker/cert-sync.sh:/cert-sync.sh:ro
+
+# ─── persistent volumes ─────────────────────────────────
+
+volumes:
+  minica-data:
+  npm_data:
+  npm_mysql:
+  npm_letsencrypt:
+
+
