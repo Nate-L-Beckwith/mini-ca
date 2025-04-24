@@ -29,7 +29,7 @@ default_name = "npm"
 npm_name = input(f"NPM container name [{default_name}]: ").strip() or default_name
 host_ip  = input(f"Docker host IP [{host_ip()}]: ").strip() or host_ip()
 admin_em = input("Initial NPM admin email [admin@npm]: ").strip() or "admin@npm"
-
+npm_pass = 'changeme'
 # ── write .env (fresh) ─────────────────────────────────────────────────────
 env_path = Path(__file__).resolve().parent / ".env"
 if env_path.exists():
@@ -51,7 +51,7 @@ env_path.write_text(textwrap.dedent(f"""\
     ### Nginx‑Proxy‑Manager ##################################################
     NPM_CONTAINER_NAME={npm_name}
     INITIAL_ADMIN_EMAIL={admin_em}
-    NPM_INITIAL_PASSWORD={token()}
+    NPM_INITIAL_PASSWORD={npm_pass}
 
     # host‑port bindings
     NPM_PORT={host_ip}:80:80
