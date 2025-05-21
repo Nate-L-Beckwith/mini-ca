@@ -89,6 +89,20 @@ mini‑ca/
 └─ README.md                 # you’re here
 ```
 
+## Working model
+
+The Python files inside `run/` form a minimal certificate authority:
+
+* **init_ca.py** – creates the root key and certificate.
+* **issue_cert.py** – generates leaf certificates signed by that root CA.
+* **watch.py** – monitors a domain list and issues new certificates
+  automatically.
+
+`mini_ca.py` exposes these building blocks through a Typer CLI. The Docker
+entrypoints (`entry.sh` and `entry-init.sh`) call the CLI to start the domain
+watcher or to bootstrap the CA. Optional `cert-sync.sh` pushes the resulting
+certificates into Nginx‑Proxy‑Manager.
+
 ---
 
 ## Docker stack
@@ -229,6 +243,3 @@ Internally:
 ### License
 
 Released under the [MIT License](LICENSE).
-```
-
----
