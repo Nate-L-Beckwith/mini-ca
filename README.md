@@ -45,10 +45,13 @@
 git clone https://github.com/your‑org/mini‑ca.git
 cd mini‑ca
 
-# 1  Build the image and bootstrap the root CA (+ persistent volume)
+# 1  Generate a .env file (interactive)
+python3 genenv.py
+
+# 2  Build the image and bootstrap the root CA (+ persistent volume)
 make setup                 # == build → init → up
 
-# 2  Mint a certificate whenever you need one
+# 3  Mint a certificate whenever you need one
 docker compose run --rm cli issue blog.acme.test --san www.blog.acme.test
 ```
 
@@ -177,8 +180,8 @@ Watcher log:
 |--------|-------------|
 | **setup** | build → init → up (*everything, once*). |
 | **issue** | `make issue DOMAIN=foo.dev [SAN=alt.dev]` – thin wrapper around the CLI service. |
-| **up / down** | start / stop watcher (does not touch data). |
-| **clean** | stop + remove volume (fast clean slate, keeps images). |
+| **up** | start the watcher (no build). |
+| **clean** | stop and remove containers (keeps the data volume). |
 | **nuke** | full wipe – all containers, networks, **any volume or image whose name starts `mini-ca_`** and every image labelled `com.docker.compose.project=mini-ca`. |
 
 ---
@@ -187,8 +190,8 @@ Watcher log:
 
 | Want | Command |
 |------|---------|
-| Stop stack, keep certificates | `make down` |
-| Wipe certificates, keep images | `make clean` |
+| Stop stack, keep certificates | `make clean` |
+| Wipe certificates, keep images | `make clean && docker volume rm mini-ca_minica-data` |
 | Re‑bootstrap root CA | `make clean && make init` |
 | Delete *everything* (volumes, images, build cache) | `make nuke` |
 
