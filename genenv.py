@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-genenv.py – create (or replace) .env for the mini‑ca + NPM bundle.
+genenv.py - creat- (or replace) .env for the mini-ca + NPM bundle.
 
 * Blows away any existing .env.
 * Lets you choose the container name once; every DB user / schema setting
-  reuses that value so there’s no duplication.
+  reuses that value so there's no duplication.
 """
 
 from pathlib import Path
@@ -30,6 +30,7 @@ npm_name = input(f"NPM container name [{default_name}]: ").strip() or default_na
 host_ip  = input(f"Docker host IP [{host_ip()}]: ").strip() or host_ip()
 admin_em = input("Initial NPM admin email [admin@npm]: ").strip() or "admin@npm"
 npm_pass = 'changeme'
+
 # ── write .env (fresh) ─────────────────────────────────────────────────────
 env_path = Path(__file__).resolve().parent / ".env"
 if env_path.exists():
@@ -48,12 +49,12 @@ env_path.write_text(textwrap.dedent(f"""\
     MYSQL_ROOT_PASSWORD={token()}
     DB_MYSQL_PASSWORD={token()}
 
-    ### Nginx‑Proxy‑Manager ##################################################
+    ### Nginx-Proxy-Manager ##################################################
     NPM_CONTAINER_NAME={npm_name}
     INITIAL_ADMIN_EMAIL={admin_em}
     NPM_INITIAL_PASSWORD={npm_pass}
 
-    # host‑port bindings
+    # host-port bindings
     NPM_PORT={host_ip}:80:80
     NPM_UI_PORT={host_ip}:81:81
     NPM_S_PORTS={host_ip}:443:443
