@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import typer
 from cryptography import x509
@@ -29,7 +29,7 @@ def issue_cert(
     # ─── build X.509 ──────────────────────────────────────────────────────
     key  = rsa.generate_private_key(65537, 2048)
     subj = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, domain)])
-    sans = [x509.DNSName(domain), *[x509.DNSName(d) for d in san]]
+    sans = [x509.DNSName(d) for d in dict.fromkeys([domain, *san])]
 
     cert = (
         x509.CertificateBuilder()
@@ -37,8 +37,8 @@ def issue_cert(
         .issuer_name(ca_cert.subject)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.utcnow())
-        .not_valid_after(datetime.utcnow() + timedelta(days=825))
+        .not_valid_before(datetime.now(timezone.utc))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=825))
         .add_extension(x509.SubjectAlternativeName(sans), False)
         .sign(ca_key, hashes.SHA256())
     )
