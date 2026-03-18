@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-genenv.py - creat- (or replace) .env for the mini-ca + NPM bundle.
+genenv.py - create (or replace) .env for the mini-ca + NPM bundle.
 
 * Blows away any existing .env.
 * Lets you choose the container name once; every DB user / schema setting
