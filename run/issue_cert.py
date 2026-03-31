@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import typer
 from cryptography import x509
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
@@ -40,6 +40,24 @@ def issue_cert(
         .not_valid_before(datetime.now(timezone.utc))
         .not_valid_after(datetime.now(timezone.utc) + timedelta(days=825))
         .add_extension(x509.SubjectAlternativeName(sans), False)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True, key_encipherment=True,
+                content_commitment=False, key_agreement=False,
+                key_cert_sign=False, crl_sign=False,
+                data_encipherment=False, encipher_only=False, decipher_only=False,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
+            critical=False,
+        )
+        .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), False)
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_cert.public_key()),
+            False,
+        )
         .sign(ca_key, hashes.SHA256())
     )
 

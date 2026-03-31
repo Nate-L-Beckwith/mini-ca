@@ -29,7 +29,7 @@ default_name = "npm"
 npm_name = input(f"NPM container name [{default_name}]: ").strip() or default_name
 host_ip  = input(f"Docker host IP [{host_ip()}]: ").strip() or host_ip()
 admin_em = input("Initial NPM admin email [admin@npm]: ").strip() or "admin@npm"
-npm_pass = 'changeme'
+npm_pass = token()
 
 # ── write .env (fresh) ─────────────────────────────────────────────────────
 env_path = Path(__file__).resolve().parent / ".env"

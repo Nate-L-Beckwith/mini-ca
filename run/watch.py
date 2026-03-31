@@ -1,7 +1,9 @@
 from pathlib import Path
-import time, typer
-from watchdog.observers import Observer
+import time
+
+import typer
 from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 from ca_core import ensure_dir
 from issue_cert import issue_cert
@@ -17,7 +19,7 @@ class _Handler(FileSystemEventHandler):
 
     def _process(self):
         ensure_dir(self.file.parent)
-        domains = {d.strip() for d in self.file.read_text().splitlines() if d}
+        domains = {s for d in self.file.read_text().splitlines() if (s := d.strip())}
         new = domains - self._known
         for d in sorted(new):
             issue_cert(d, [], self.ca, self.certs)
