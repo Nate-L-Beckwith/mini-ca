@@ -20,7 +20,7 @@ class _Handler(FileSystemEventHandler):
 
     def _process(self):
         ensure_dir(self.file.parent)
-        domains = {d.strip() for d in self.file.read_text().splitlines() if d}
+        domains = {d.strip() for d in self.file.read_text().splitlines() if d.strip()}
         new = domains - self._known
         for d in sorted(new):
             issue_cert(d, [], self.ca, self.certs)
