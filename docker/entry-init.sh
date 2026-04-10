@@ -4,10 +4,18 @@ set -eu
 echo "[minica‑init] ensuring perms on /data"
 chown -R 1001:1001 /data || true
 
-# build the command string safely — expected arg is only --force
-INIT_CMD="touch /data/DOMAINS && mini_ca.py init"
+# only allow the supported --force flag; reject anything else
+FORCE_ARG=""
 for arg in "$@"; do
-  INIT_CMD="$INIT_CMD $arg"
+  case "$arg" in
+    --force)
+      FORCE_ARG=" --force"
+      ;;
+    *)
+      echo "[minica-init] unsupported argument: $arg" >&2
+      exit 1
+      ;;
+  esac
 done
 
-su -s /bin/sh -c "$INIT_CMD" myca
+su -s /bin/sh -c "touch /data/DOMAINS && mini_ca.py init$FORCE_ARG" myca
