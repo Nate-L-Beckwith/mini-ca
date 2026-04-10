@@ -26,10 +26,9 @@ def token() -> str:
 
 # ── interactive prompts ────────────────────────────────────────────────────
 default_name = "npm"
-npm_name        = input(f"NPM container name [{default_name}]: ").strip() or default_name
-_default_ip     = host_ip()
-docker_host_ip  = input(f"Docker host IP [{_default_ip}]: ").strip() or _default_ip
-admin_em    = input("Initial NPM admin email [admin@npm]: ").strip() or "admin@npm"
+npm_name = input(f"NPM container name [{default_name}]: ").strip() or default_name
+host_ip  = input(f"Docker host IP [{host_ip()}]: ").strip() or host_ip()
+admin_em = input("Initial NPM admin email [admin@npm]: ").strip() or "admin@npm"
 npm_pass = 'changeme'
 
 # ── write .env (fresh) ─────────────────────────────────────────────────────
