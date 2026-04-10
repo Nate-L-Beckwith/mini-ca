@@ -30,7 +30,6 @@ def init_ca(ca_dir: Path, force: bool) -> None:
         .not_valid_before(datetime.now(timezone.utc))
         .not_valid_after(datetime.now(timezone.utc) + timedelta(days=3650))
         .add_extension(x509.BasicConstraints(ca=True, path_length=None), True)
-        .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), False)
         .sign(key, hashes.SHA256())
     )
 

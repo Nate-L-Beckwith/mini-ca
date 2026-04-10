@@ -15,9 +15,19 @@ cp "/certs/certificates/${SHORT}/${DOMAIN}.key" "$DST/privkey.pem"
 echo "✅  copied cert to $DST"
 
 BASE=http://127.0.0.1:81
+
+# wait for NPM API to become available
+echo "⏳  waiting for NPM API …"
+for i in $(seq 1 30); do
+  curl -sf "$BASE/api" >/dev/null 2>&1 && break
+  sleep 2
+done
+
+PAYLOAD=$(jq -n --arg id "$INITIAL_ADMIN_EMAIL" --arg pw "$NPM_INITIAL_PASSWORD" \
+  '{identity: $id, secret: $pw}')
 TOKEN=$(curl -s --fail -X POST "$BASE/api/tokens" \
           -H "Content-Type: application/json" \
-          --data '{"identity":"'"$INITIAL_ADMIN_EMAIL"'","secret":"'"$NPM_INITIAL_PASSWORD"'"}' |
+          --data "$PAYLOAD" |
         jq -r .token)
 
 # 1) Create/lookup record

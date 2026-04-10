@@ -15,11 +15,12 @@ class _Handler(FileSystemEventHandler):
         self._known = set()
 
     def on_modified(self, event):
-        self._process()
+        if Path(event.src_path).name == self.file.name:
+            self._process()
 
     def _process(self):
         ensure_dir(self.file.parent)
-        domains = {s for d in self.file.read_text().splitlines() if (s := d.strip())}
+        domains = {d.strip() for d in self.file.read_text().splitlines() if d}
         new = domains - self._known
         for d in sorted(new):
             issue_cert(d, [], self.ca, self.certs)

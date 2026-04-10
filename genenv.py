@@ -29,7 +29,7 @@ default_name = "npm"
 npm_name = input(f"NPM container name [{default_name}]: ").strip() or default_name
 host_ip  = input(f"Docker host IP [{host_ip()}]: ").strip() or host_ip()
 admin_em = input("Initial NPM admin email [admin@npm]: ").strip() or "admin@npm"
-npm_pass = token()
+npm_pass = 'changeme'
 
 # ── write .env (fresh) ─────────────────────────────────────────────────────
 env_path = Path(__file__).resolve().parent / ".env"
@@ -39,7 +39,7 @@ if env_path.exists():
 env_path.write_text(textwrap.dedent(f"""\
     ### Global ###############################################################
     TZ=America/New_York
-    DOCKERHOST={host_ip}
+    DOCKERHOST={docker_host_ip}
 
     ### MariaDB (used by NPM) ################################################
     DB_MYSQL_HOST=db
@@ -55,9 +55,9 @@ env_path.write_text(textwrap.dedent(f"""\
     NPM_INITIAL_PASSWORD={npm_pass}
 
     # host-port bindings
-    NPM_PORT={host_ip}:80:80
-    NPM_UI_PORT={host_ip}:81:81
-    NPM_S_PORTS={host_ip}:443:443
+    NPM_PORT={docker_host_ip}:80:80
+    NPM_UI_PORT={docker_host_ip}:81:81
+    NPM_S_PORTS={docker_host_ip}:443:443
     """))
 
 print("✅  .env written →", env_path)

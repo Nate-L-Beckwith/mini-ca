@@ -4,7 +4,6 @@ COMPOSE       = docker compose -f docker-compose.yml --project-name $(PROJECT)
 
 CLI_RUN       = $(COMPOSE) --profile cli  run --rm cli
 SYNC_RUN      = $(COMPOSE) --profile sync run --rm -e DOMAIN=$(DOMAIN) cert-sync
-LOCAL_IMAGES = minica:latest
 
 # ────────────────────────── targets ────────────────────────────
 .PHONY: help build setup up init issue restart-npm logs clean nuke
