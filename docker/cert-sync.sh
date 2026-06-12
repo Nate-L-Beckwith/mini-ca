@@ -7,11 +7,25 @@ apk add --no-cache curl jq >/dev/null 2>&1
 : "${INITIAL_ADMIN_EMAIL:?missing}"
 : "${NPM_INITIAL_PASSWORD:?missing}"
 
-SHORT=${DOMAIN%%.*}
-DST=/data/custom_ssl/$(echo "$DOMAIN" | tr . _)
+# Derive the folder name exactly as issue_cert.py's _short_label does:
+# strip a leading "*." then take the leading DNS label.
+STRIPPED=${DOMAIN#\*.}
+FOLDER=${STRIPPED%%.*}
+
+# Filesystem-safe domain for on-disk filenames: '*.eos.home' -> '_wildcard.eos.home'.
+# Only *file paths* use this; the NPM payload below keeps the real "$DOMAIN".
+SAFE_DOMAIN=$(printf '%s' "$DOMAIN" | sed 's/^\*\./_wildcard./')
+
+CERT_SRC="/certs/certificates/${FOLDER}/${SAFE_DOMAIN}.crt"
+KEY_SRC="/certs/certificates/${FOLDER}/${SAFE_DOMAIN}.key"
+
+[ -f "$CERT_SRC" ] || { echo "❌ cert not found: $CERT_SRC" >&2; exit 1; }
+[ -f "$KEY_SRC" ]  || { echo "❌ key not found: $KEY_SRC"  >&2; exit 1; }
+
+DST="/data/custom_ssl/$(printf '%s' "$SAFE_DOMAIN" | tr . _)"
 mkdir -p "$DST"
-cp "/certs/certificates/${SHORT}/${DOMAIN}.crt" "$DST/fullchain.pem"
-cp "/certs/certificates/${SHORT}/${DOMAIN}.key" "$DST/privkey.pem"
+cp "$CERT_SRC" "$DST/fullchain.pem"
+cp "$KEY_SRC"  "$DST/privkey.pem"
 echo "✅  copied cert to $DST"
 
 BASE=http://127.0.0.1:81

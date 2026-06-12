@@ -14,6 +14,11 @@ def _short_label(name: str) -> str:
     return name.lstrip("*.").split(".")[0]
 
 
+def safe_filename(domain: str) -> str:
+    """Filesystem-safe name: '*.eos.home' -> '_wildcard.eos.home'."""
+    return domain.replace("*.", "_wildcard.", 1) if domain.startswith("*.") else domain
+
+
 def issue_cert(
     domain: str,
     san: list[str],
@@ -78,21 +83,27 @@ def issue_cert(
     )
 
     # ─── output folder ────────────────────────────────────────────────────
-    folder   = domain if full_path else _short_label(domain)
+    # Cert *contents* keep the real domain (CN/SAN stay '*.eos.home'); only the
+    # files/folders on disk are made glob-safe via safe_filename().
+    folder   = safe_filename(domain) if full_path else safe_filename(_short_label(domain))
+    fname    = safe_filename(domain)
     out_dir  = certs_dir / folder
     ensure_dir(out_dir)
 
-    (out_dir / f"{domain}.key").write_bytes(
+    key_path  = out_dir / f"{fname}.key"
+    cert_path = out_dir / f"{fname}.crt"
+
+    key_path.write_bytes(
         key.private_bytes(
             serialization.Encoding.PEM,
             serialization.PrivateFormat.TraditionalOpenSSL,
             serialization.NoEncryption(),
         )
     )
-    (out_dir / f"{domain}.crt").write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
 
     typer.echo(
         f"\n✅  Certificate issued for '{domain}' → {out_dir}\n"
-        f"   ‣ cert : {out_dir}/{domain}.crt\n"
-        f"   ‣ key  : {out_dir}/{domain}.key"
+        f"   ‣ cert : {cert_path}\n"
+        f"   ‣ key  : {key_path}"
     )
