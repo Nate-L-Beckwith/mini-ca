@@ -1,3 +1,4 @@
-cryptography
-typer[all]
-watchdog
+# Runtime dependencies, pinned for reproducible images. Bump deliberately.
+cryptography==50.0.1
+typer==0.27.2
+watchdog==6.0.0

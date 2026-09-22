@@ -1,0 +1,20 @@
+# Keep LF line endings in the repository AND in every checkout, so shell scripts
+# and bind-mounted files work inside Linux containers even when cloned on Windows
+# (core.autocrlf=true would otherwise turn "#!/usr/bin/env sh" into "...sh\r").
+*             text=auto eol=lf
+
+*.sh          text eol=lf
+*.py          text eol=lf
+*.yml         text eol=lf
+*.yaml        text eol=lf
+*.md          text eol=lf
+*.txt         text eol=lf
+Makefile      text eol=lf
+Dockerfile    text eol=lf
+.env.example  text eol=lf
+
+*.png         binary
+*.jpg         binary
+*.key         binary
+*.crt         binary
+*.pem         binary

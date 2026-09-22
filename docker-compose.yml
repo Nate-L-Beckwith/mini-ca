@@ -1,96 +1,120 @@
 ###############################################################################
-# mini‑ca – local CA + Nginx‑Proxy‑Manager (self‑contained)
-x-minica-image: &minica-image
-  image: minica:latest
-  build:
-    context: .
-    dockerfile: docker/Dockerfile
-
+# mini-ca — private CA + optional Nginx Proxy Manager (NPM) stack
+#
+#   python3 genenv.py            write .env (passwords, ports, image)
+#   make setup                   build → init root CA → start stack
+#   make issue DOMAIN=host       issue a cert and push it into NPM
+#   docker compose --profile cli run --rm cli --help
+#
+# Profiles:  (default) minica db npm   |  setup: init   |  cli: cli   |  sync: cert-sync
 ###############################################################################
+
+x-minica: &minica
+  image: ${MINICA_IMAGE:-ghcr.io/nate-l-beckwith/mini-ca:latest}
+  environment:
+    TZ: ${TZ:-UTC}
+    MINICA_CA_NAME: ${MINICA_CA_NAME:-mini-ca root}
+    MINICA_LEAF_DAYS: ${MINICA_LEAF_DAYS:-825}
+    MINICA_RENEW_DAYS: ${MINICA_RENEW_DAYS:-30}
+  volumes:
+    - minica-data:/data
+
 services:
-# ─── mini‑ca – local init ─────────────────────────────────
+  # ─── mini-ca: domain-list watcher (default profile) ───────────────────────
+  minica:
+    <<: *minica
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        VERSION: ${MINICA_VERSION:-dev}
+    user: "1001"
+    restart: unless-stopped
+
+  # ─── mini-ca: one-shot root CA bootstrap (profile: setup) ─────────────────
+  # Runs as root only to fix the ownership of volumes created before 1.1 or of
+  # bind mounts; a fresh named volume already belongs to uid 1001.
   init:
-    <<: *minica-image
+    <<: *minica
     user: "0"
     entrypoint: ["entry-init.sh"]
-    volumes:
-      - minica-data:/data
     profiles: ["setup"]
     restart: "no"
 
-# ─── mini‑ca – local CA ─────────────────────────────────
-  minica:
-    <<: *minica-image
-    user: "1001"
-    volumes:
-      - minica-data:/data
-    restart: unless-stopped
-
-# ─── mini‑ca – local CA – CLI ────────────────────────────
+  # ─── mini-ca: ad-hoc CLI (profile: cli) ───────────────────────────────────
   cli:
-    <<: *minica-image
+    <<: *minica
     entrypoint: ["mini_ca.py"]
     user: "1001"
     profiles: ["cli"]
+
+  # ─── cert-sync: push an issued cert into NPM over its API (profile: sync) ──
+  # Shares NPM's network namespace so the admin API is reachable on 127.0.0.1:81.
+  # Only the certificates/ subtree is mounted: the root CA key never leaves minica.
+  cert-sync:
+    image: ${MINICA_IMAGE:-ghcr.io/nate-l-beckwith/mini-ca:latest}
+    entrypoint: ["mini_ca.py", "npm-sync"]
+    user: "1001"
+    depends_on: [npm]
+    network_mode: service:npm
+    environment:
+      TZ: ${TZ:-UTC}
+      NPM_API_URL: ${NPM_API_URL:-http://127.0.0.1:81}
+      NPM_API_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@npm}
+      NPM_API_PASSWORD: ${NPM_INITIAL_PASSWORD:-${INITIAL_ADMIN_PASSWORD:-changeme}}
     volumes:
-      - minica-data:/data
-      - npm_data:/npm-data
+      - type: volume
+        source: minica-data
+        target: /data/certificates
+        read_only: true
+        volume:
+          subpath: certificates
+    profiles: ["sync"]
+    restart: "no"
 
-
-# ─── MariaDB ──────────────────────────────────────────────
+  # ─── MariaDB for NPM ──────────────────────────────────────────────────────
   db:
     image: jc21/mariadb-aria:latest
-    container_name: ${NPM_CONTAINER_NAME}_db
-    env_file: .env
+    container_name: ${NPM_CONTAINER_NAME:-npm}_db
     environment:
+      TZ: ${TZ:-UTC}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE:      ${DB_MYSQL_NAME}
-      MYSQL_USER:          ${DB_MYSQL_USER}
-      MYSQL_PASSWORD:      ${DB_MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${DB_MYSQL_NAME:-npm}
+      MYSQL_USER: ${DB_MYSQL_USER:-npm}
+      MYSQL_PASSWORD: ${DB_MYSQL_PASSWORD}
     volumes:
       - npm_mysql:/var/lib/mysql
     restart: unless-stopped
 
-# ─── Nginx‑Proxy‑Manager ─────────────────────────────────
+  # ─── Nginx Proxy Manager ──────────────────────────────────────────────────
   npm:
-    image: jc21/nginx-proxy-manager:latest
-    container_name: npm
-    env_file: .env
+    image: jc21/nginx-proxy-manager:2
+    container_name: ${NPM_CONTAINER_NAME:-npm}
     depends_on: [db]
+    environment:
+      TZ: ${TZ:-UTC}
+      DB_MYSQL_HOST: ${DB_MYSQL_HOST:-db}
+      DB_MYSQL_PORT: ${DB_MYSQL_PORT:-3306}
+      DB_MYSQL_USER: ${DB_MYSQL_USER:-npm}
+      DB_MYSQL_PASSWORD: ${DB_MYSQL_PASSWORD}
+      DB_MYSQL_NAME: ${DB_MYSQL_NAME:-npm}
+      # NPM >= 2.13 ships without a default admin: these create it on first start
+      # (cert-sync also creates it from its own credentials if NPM is still un-configured)
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@npm}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-${NPM_INITIAL_PASSWORD:-changeme}}
+      DISABLE_IPV6: ${DISABLE_IPV6:-false}
     ports:
-      - "${NPM_PORT}"
-      - "${NPM_UI_PORT}"
-      - "${NPM_S_PORTS}"
+      - "${NPM_PORT:-80:80}"
+      - "${NPM_UI_PORT:-81:81}"
+      - "${NPM_S_PORTS:-443:443}"
     volumes:
       - npm_data:/data
       - npm_letsencrypt:/etc/letsencrypt
-      - minica-data:/certs:ro
     restart: unless-stopped
 
-# ─── Nginx‑Proxy‑Manager – SSL cert sync ─────────────────
-  cert-sync:
-    image: alpine:latest
-    container_name: cert-sync
-    env_file: .env
-    depends_on: [npm]
-    entrypoint:  ["/cert-sync.sh"]
-    environment:
-      - INITIAL_ADMIN_EMAIL
-      - NPM_INITIAL_PASSWORD
-    network_mode: service:npm
-    profiles: ["sync"]
-    restart: "no"
-    volumes:
-      - minica-data:/certs:ro
-      - npm_data:/data
-      - ./docker/cert-sync.sh:/cert-sync.sh:ro
-
-# ─── persistent volumes ─────────────────────────────────
-
+# ─── persistent volumes ──────────────────────────────────────────────────────
 volumes:
   minica-data:
   npm_data:
   npm_mysql:
   npm_letsencrypt:
-
-

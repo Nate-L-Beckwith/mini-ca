@@ -1,0 +1,10 @@
+# Allow-list: only what the Dockerfile COPYs enters the build context.
+# Keeps .git, .env (secrets), local certificates and editor files out of the image build.
+*
+!requirements.txt
+!run/
+!docker/entry.sh
+!docker/entry-init.sh
+
+run/__pycache__/
+**/*.pyc

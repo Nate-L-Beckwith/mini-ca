@@ -1,7 +1,22 @@
+# secrets / local config
 .env
+.env.*
+!.env.example
+
+# certificates and keys that may be exported to the checkout
 *.key
 *.crt
 *.pem
 rootCA/
 certificates/
+
+# python
+__pycache__/
 *.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# OneDrive / Windows folder metadata
+desktop.ini
+Thumbs.db
