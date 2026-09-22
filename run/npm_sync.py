@@ -3,7 +3,7 @@
 Flow against NPM's admin API (default http://127.0.0.1:81, i.e. run in NPM's
 network namespace):
 
-    0. GET  /api                                 readiness; ``setup: false`` means no admin exists yet
+    0. GET  /api/                                readiness; ``setup: false`` means no admin exists yet
        POST /api/users                           (only then) create the admin from the cert-sync credentials
     1. POST /api/tokens                          {identity, secret}   -> {token}
     2. GET  /api/nginx/certificates              find provider "other" record whose nice_name is the domain
@@ -77,12 +77,16 @@ class NPMClient:
 
     # operations -------------------------------------------------------------
     def status(self) -> dict[str, Any]:
-        """GET /api — unauthenticated; ``{"status": "OK", "setup": bool, "version": {...}}``."""
-        data = self._request("GET", "/api")
+        """GET /api/ — unauthenticated; ``{"status": "OK", "setup": bool, "version": {...}}``.
+
+        The trailing slash matters: NPM's nginx answers ``/api`` with a redirect
+        whose Location carries the container-internal port.
+        """
+        data = self._request("GET", "/api/")
         return data if isinstance(data, dict) else {}
 
     def wait_ready(self, attempts: int = 30, delay: float = 2.0) -> dict[str, Any]:
-        """Block until GET /api answers (NPM takes a while after container start)."""
+        """Block until GET /api/ answers (NPM takes a while after container start)."""
         for attempt in range(1, attempts + 1):
             try:
                 return self.status()

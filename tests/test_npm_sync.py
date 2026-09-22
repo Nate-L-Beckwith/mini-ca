@@ -59,7 +59,7 @@ class FakeNPM:
 
             def do_GET(self):
                 fake.requests.append(("GET", self.path))
-                if self.path == "/api":
+                if self.path in ("/api", "/api/"):
                     return self._send(200, {"status": "OK", "setup": bool(fake.users), "version": {"major": 2}})
                 if self.path == "/api/nginx/certificates":
                     if not self._authed():
@@ -161,13 +161,13 @@ def test_sync_bootstraps_admin_on_fresh_npm(ca: Path, fresh_npm: FakeNPM) -> Non
     issue_cert("blog.lan", [], ca, ca_core.certs_dir())
     assert npm_sync("blog.lan", ca_core.certs_dir(), fresh_npm.url, *ADMIN, wait=True) == 7
     assert fresh_npm.users == {ADMIN[0]: ADMIN[1]}
-    assert fresh_npm.requests[:3] == [("GET", "/api"), ("POST", "/api/users"), ("POST", "/api/tokens")]
+    assert fresh_npm.requests[:3] == [("GET", "/api/"), ("POST", "/api/users"), ("POST", "/api/tokens")]
 
 
 def test_sync_finds_wildcard_files(ca: Path, npm: FakeNPM) -> None:
     issue_cert("*.wild.dev", [], ca, ca_core.certs_dir())
     assert npm_sync("*.wild.dev", ca_core.certs_dir(), npm.url, *ADMIN, wait=True) == 7
-    assert npm.requests[0] == ("GET", "/api")
+    assert npm.requests[0] == ("GET", "/api/")
     assert npm.certificates[0]["nice_name"] == "*.wild.dev"
 
 

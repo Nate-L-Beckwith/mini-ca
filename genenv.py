@@ -39,6 +39,13 @@ def token(nbytes: int = 24) -> str:
     return secrets.token_urlsafe(nbytes)
 
 
+def running_in_wsl() -> bool:
+    try:
+        return "microsoft" in Path("/proc/version").read_text().lower()
+    except OSError:
+        return False
+
+
 def ask(prompt: str, default: str, assume_yes: bool) -> str:
     if assume_yes:
         return default
@@ -111,6 +118,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     name = args.name or ask("NPM container name", "npm", args.yes)
+    if not args.ip and running_in_wsl():
+        print("ℹ️  running inside WSL: the auto-detected address is the WSL VM's, not the Windows LAN IP.")
+        print("    Use the Windows adapter address (ipconfig) or 0.0.0.0 to listen on all interfaces.")
     ip = args.ip or ask("Docker host IP for NPM port bindings", host_ip(), args.yes)
     ui_bind = args.ui_bind or ask("Bind NPM admin UI (:81) to", ip, args.yes)
     email = args.email or ask("Initial NPM admin e-mail", "admin@npm", args.yes)
