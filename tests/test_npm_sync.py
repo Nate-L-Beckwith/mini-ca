@@ -30,6 +30,7 @@ class FakeNPM:
     def __init__(self, users: dict[str, str] | None = None) -> None:
         self.users: dict[str, str] = dict(users or {})
         self.certificates: list[dict] = []
+        self.proxy_hosts: list[dict] = []
         self.uploads: list[tuple[int, dict[str, bytes]]] = []
         self.requests: list[tuple[str, str]] = []
         self.token = "tok-" + "x" * 16
@@ -65,6 +66,10 @@ class FakeNPM:
                     if not self._authed():
                         return self._send(403, {"error": {"message": "Permission Denied"}})
                     return self._send(200, fake.certificates)
+                if self.path == "/api/nginx/proxy-hosts":
+                    return self._send(200, fake.proxy_hosts) if self._authed() else self._send(403, {})
+                if self.path in ("/api/nginx/redirection-hosts", "/api/nginx/dead-hosts", "/api/nginx/streams"):
+                    return self._send(200, []) if self._authed() else self._send(403, {})
                 self._send(404, {"error": "nope"})
 
             def do_POST(self):
@@ -203,3 +208,21 @@ def test_cli_npm_sync_reads_env(ca: Path, npm: FakeNPM, monkeypatch: pytest.Monk
     assert "#7 created" in result.output
     missing = runner.invoke(APP, ["npm-sync", "nothing.lan", "--no-wait"])
     assert missing.exit_code == 1 and "run 'issue' first" in missing.output
+
+
+def test_sync_prefers_the_record_a_host_uses(ca: Path, npm: FakeNPM, capsys: pytest.CaptureFixture[str]) -> None:
+    """The 1.0 script left duplicate records behind; renewing the wrong one never reaches nginx."""
+    issue_cert("blog.lan", [], ca, ca_core.certs_dir())
+    npm.certificates = [
+        {"id": 3, "provider": "other", "nice_name": "blog.lan", "domain_names": []},
+        {"id": 5, "provider": "other", "nice_name": "blog.lan", "domain_names": []},
+        {"id": 6, "provider": "letsencrypt", "nice_name": "blog.lan", "domain_names": []},
+    ]
+    npm.next_id = 7
+
+    assert npm_sync("blog.lan", ca_core.certs_dir(), npm.url, *ADMIN, wait=False) == 5  # nothing attached: newest
+    npm.proxy_hosts = [{"id": 1, "domain_names": ["blog.lan"], "certificate_id": 3}]
+    assert npm_sync("blog.lan", ca_core.certs_dir(), npm.url, *ADMIN, wait=False) == 3  # attached record wins
+    assert len(npm.certificates) == 3 and [u[0] for u in npm.uploads] == [5, 3]
+    err = capsys.readouterr().err
+    assert "2 NPM certificate records are named 'blog.lan'" in err and "updating #3 (attached to a host)" in err

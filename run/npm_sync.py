@@ -124,11 +124,43 @@ class NPMClient:
         self.token = token
 
     def find_certificate(self, nice_name: str) -> int | None:
+        """Return the id of the custom certificate record named *nice_name*, or None.
+
+        The pre-1.1 shell script created a new record on every run, so an NPM
+        instance may hold several records with the same name. Prefer the one a
+        host actually uses (updating any other would never reach nginx), then
+        the newest, and say so.
+        """
         items = self._request("GET", "/api/nginx/certificates") or []
-        for item in items:
-            if item.get("provider") == "other" and item.get("nice_name") == nice_name:
-                return int(item["id"])
-        return None
+        matches = sorted(int(i["id"]) for i in items if i.get("provider") == "other" and i.get("nice_name") == nice_name)
+        if not matches:
+            return None
+        if len(matches) == 1:
+            return matches[0]
+        in_use = self.certificate_ids_in_use()
+        chosen = next((cid for cid in reversed(matches) if cid in in_use), matches[-1])
+        others = ", ".join(f"#{cid}" for cid in matches if cid != chosen)
+        why = "attached to a host" if chosen in in_use else "newest"
+        typer.echo(
+            f"⚠️  {len(matches)} NPM certificate records are named {nice_name!r} "
+            f"(ids {', '.join(map(str, matches))}); updating #{chosen} ({why}). "
+            f"Delete the unused ones under SSL Certificates: {others}",
+            err=True,
+        )
+        return chosen
+
+    def certificate_ids_in_use(self) -> set[int]:
+        """Certificate ids referenced by proxy, redirection and dead hosts and streams."""
+        used: set[int] = set()
+        for path in ("/api/nginx/proxy-hosts", "/api/nginx/redirection-hosts", "/api/nginx/dead-hosts", "/api/nginx/streams"):
+            try:
+                hosts = self._request("GET", path) or []
+            except CAError:
+                continue
+            for host in hosts:
+                if host.get("certificate_id"):
+                    used.add(int(host["certificate_id"]))
+        return used
 
     def create_certificate(self, nice_name: str) -> int:
         data = self._json("POST", "/api/nginx/certificates", {"provider": "other", "nice_name": nice_name})
